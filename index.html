@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>География инфекционных заболеваний</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .controls {
+            background: #ecf0f1;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        button {
+            padding: 8px 15px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button.active {
+            background: #e74c3c;
+        }
+        .content {
+            display: flex;
+            flex: 1;
+        }
+        #map {
+            flex: 2;
+            height: 100%;
+        }
+        .sidebar {
+            flex: 1;
+            padding: 15px;
+            background: #f9f9f9;
+            overflow-y: auto;
+            border-left: 1px solid #ddd;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #2c3e50;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .legend {
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+        .legend i {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>География инфекционных заболеваний</h1>
+    </header>
+
+    <div class="controls">
+        <button class="active" onclick="showDisease('malaria')">Малярия</button>
+        <button onclick="showDisease('hiv')">ВИЧ/СПИД</button>
+        <button onclick="showDisease('tuberculosis')">Туберкулёз</button>
+        <button onclick="showDisease('cholera')">Холера</button>
+        <button onclick="showDisease('dengue')">Лихорадка Денге</button>
+    </div>
+
+    <div class="content">
+        <div id="map"></div>
+        <div class="sidebar">
+            <div class="legend">
+                <h3>Уровни распространения:</h3>
+                <div><i style="background:#ff0000;"></i> Очень высокий</div>
+                <div><i style="background:#ff9900;"></i> Высокий</div>
+                <div><i style="background:#ffff00;"></i> Средний</div>
+            </div>
+            <h2 id="disease-title">Малярия</h2>
+            <div id="disease-description">Тропическое заболевание, передающееся через укусы комаров.</div>
+            <h3>Основные очаги:</h3>
+            <table id="disease-table">
+                <thead>
+                    <tr>
+                        <th>Страна/Регион</th>
+                        <th>Уровень</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- Данные будут заполняться динамически -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Инициализация карты
+        const map = L.map('map').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        // Цвета для уровней интенсивности
+        const colors = {
+            3: '#ff0000', // Очень высокий
+            2: '#ff9900', // Высокий
+            1: '#ffff00'  // Средний
+        };
+
+        // Полные данные по заболеваниям
+        const diseaseData = {
+            malaria: {
+                title: "Малярия",
+                description: "Тропическое заболевание, передающееся через укусы комаров. Основные переносчики - комары рода Anopheles.",
+                zones: [
+                    { lat: 6.3690, lng: 20.3982, name: "Центральная Африка", intensity: 3 },
+                    { lat: 12.2383, lng: -1.5616, name: "Буркина-Фасо", intensity: 3 },
+                    { lat: 9.1450, lng: 40.4897, name: "Эфиопия", intensity: 2 },
+                    { lat: 7.9465, lng: -1.0232, name: "Гана", intensity: 2 },
+                    { lat: 18.7357, lng: -70.1627, name: "Гаити", intensity: 1 }
+                ]
+            },
+            hiv: {
+                title: "ВИЧ/СПИД",
+                description: "Вирус иммунодефицита человека. Передается через кровь, половым путем и от матери к ребенку.",
+                zones: [
+                    { lat: -26.5225, lng: 31.4659, name: "Свазиленд", intensity: 3 },
+                    { lat: -29.6099, lng: 28.2336, name: "Лесото", intensity: 3 },
+                    { lat: -22.9576, lng: 18.4904, name: "Намибия", intensity: 2 },
+                    { lat: -17.8739, lng: 31.0947, name: "Зимбабве", intensity: 2 },
+                    { lat: 1.3733, lng: 32.2903, name: "Уганда", intensity: 1 }
+                ]
+            },
+            tuberculosis: {
+                title: "Туберкулёз",
+                description: "Бактериальная инфекция, поражающая легкие. Передается воздушно-капельным путем.",
+                zones: [
+                    { lat: -25.7463, lng: 28.1881, name: "ЮАР", intensity: 3 },
+                    { lat: -15.4067, lng: 28.2871, name: "Замбия", intensity: 2 },
+                    { lat: -18.6657, lng: 35.5296, name: "Мозамбик", intensity: 2 },
+                    { lat: 55.3781, lng: -3.4360, name: "Великобритания", intensity: 1 },
+                    { lat: 61.5240, lng: 105.3188, name: "Россия", intensity: 1 }
+                ]
+            },
+            cholera: {
+                title: "Холера",
+                description: "Острая кишечная инфекция, вызываемая бактерией Vibrio cholerae. Связана с плохими санитарными условиями.",
+                zones: [
+                    { lat: 18.9712, lng: -72.2852, name: "Гаити", intensity: 3 },
+                    { lat: 15.5527, lng: 48.5164, name: "Йемен", intensity: 2 },
+                    { lat: 9.1450, lng: 40.4897, name: "Эфиопия", intensity: 1 },
+                    { lat: 23.6850, lng: 90.3563, name: "Бангладеш", intensity: 1 }
+                ]
+            },
+            dengue: {
+                title: "Лихорадка Денге",
+                description: "Вирусное заболевание, переносимое комарами Aedes. Распространена в тропиках и субтропиках.",
+                zones: [
+                    { lat: -14.2350, lng: -51.9253, name: "Бразилия", intensity: 2 },
+                    { lat: 12.8797, lng: 121.7740, name: "Филиппины", intensity: 2 },
+                    { lat: 7.8731, lng: 80.7718, name: "Шри-Ланка", intensity: 1 },
+                    { lat: 21.9162, lng: 95.9560, name: "Мьянма", intensity: 1 }
+                ]
+            }
+        };
+
+        // Слои для маркеров
+        const markers = {};
+        Object.keys(diseaseData).forEach(disease => {
+            markers[disease] = L.layerGroup();
+        });
+
+        // Создание маркеров с цветами по интенсивности
+        Object.keys(diseaseData).forEach(disease => {
+            diseaseData[disease].zones.forEach(zone => {
+                const marker = L.circleMarker([zone.lat, zone.lng], {
+                    radius: 8,
+                    fillColor: colors[zone.intensity],
+                    color: "#000",
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).bindPopup(`
+                    <b>${diseaseData[disease].title}</b><br>
+                    <b>${zone.name}</b><br>
+                    Уровень: ${getIntensityText(zone.intensity)}
+                `);
+                
+                marker.addTo(markers[disease]);
+            });
+        });
+
+        // Функция для отображения выбранного заболевания
+        function showDisease(disease) {
+            // Скрываем все слои
+            Object.keys(markers).forEach(key => {
+                map.removeLayer(markers[key]);
+            });
+            
+            // Показываем выбранное заболевание
+            markers[disease].addTo(map);
+            
+            // Обновляем активную кнопку
+            document.querySelectorAll('.controls button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Обновляем информацию в сайдбаре
+            updateSidebar(disease);
+        }
+
+        // Обновление информации в правой панели
+        function updateSidebar(disease) {
+            const data = diseaseData[disease];
+            
+            // Заголовок и описание
+            document.getElementById('disease-title').textContent = data.title;
+            document.getElementById('disease-description').textContent = data.description;
+            
+            // Заполняем таблицу
+            const tableBody = document.getElementById('table-body');
+            tableBody.innerHTML = '';
+            
+            data.zones.forEach(zone => {
+                const row = document.createElement('tr');
+                
+                const nameCell = document.createElement('td');
+                nameCell.textContent = zone.name;
+                row.appendChild(nameCell);
+                
+                const levelCell = document.createElement('td');
+                levelCell.innerHTML = `
+                    <span style="color:${colors[zone.intensity]}; font-weight:bold">
+                        ${getIntensityText(zone.intensity)}
+                    </span>
+                `;
+                row.appendChild(levelCell);
+                
+                tableBody.appendChild(row);
+            });
+        }
+
+        // Текст для уровня интенсивности
+        function getIntensityText(intensity) {
+            if (intensity === 3) return "Очень высокий";
+            if (intensity === 2) return "Высокий";
+            return "Средний";
+        }
+
+        // По умолчанию показываем малярию
+        showDisease('malaria');
+    </script>
+</body>
+</html>
